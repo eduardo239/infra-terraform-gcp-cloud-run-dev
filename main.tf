@@ -84,5 +84,5 @@ resource "google_firestore_database" "default" {
   project     = "learn-gcp-terraform-469711"
   name        = "(default)"
   location_id = "us-central1"
-  type        = "NATIVE"
+  type        = "FIRESTORE_NATIVE"
 }
