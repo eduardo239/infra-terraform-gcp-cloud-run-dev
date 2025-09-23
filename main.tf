@@ -3,6 +3,12 @@ provider "google" {
   region  = "us-central1"
 }
 
+variable "image_url" {
+  description = "The Docker image URL for the Cloud Run service"
+  type        = string
+  default     = "gcr.io/learn-gcp-terraform-469711/lastbit-dev:latest"
+}
+
 resource "google_cloud_run_service" "default" {
   name     = "lastbit-dev"
   location = "us-central1"
@@ -10,7 +16,7 @@ resource "google_cloud_run_service" "default" {
   template {
     spec {
       containers {
-        image = "gcr.io/learn-gcp-terraform-469711/lastbit-dev:1:0"
+        image = var.image_url
       }
     }
   }
