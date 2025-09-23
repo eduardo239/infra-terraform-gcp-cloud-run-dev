@@ -12,3 +12,7 @@ steps:
     - |
       terraform init
       terraform apply -auto-approve -var="image_url=gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA"
+
+# Configure logging to resolve service account error
+options:
+  logging: CLOUD_LOGGING_ONLY
