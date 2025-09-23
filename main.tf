@@ -31,11 +31,6 @@ resource "google_cloud_run_service" "default" {
           container_port = 8080
         }
 
-        env {
-          name  = "PORT"
-          value = "8080"
-        }
-
         resources {
           limits = {
             cpu    = "1000m"
