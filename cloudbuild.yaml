@@ -12,7 +12,6 @@ steps:
     - |
       terraform init
       terraform validate
-      terraform plan -var="image_url=gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA"
       terraform apply -auto-approve -var="image_url=gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA"
 
 # Configure logging to resolve service account error
