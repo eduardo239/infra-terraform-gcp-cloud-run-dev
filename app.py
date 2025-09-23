@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request, abort
+from google.cloud import firestore
 from datetime import datetime
 import logging
 
@@ -56,22 +57,36 @@ def get_users():
 @app.route('/api/users', methods=['POST'])
 def create_user():
     """Create a new user"""
-    data = request.get_json()
-    
-    if not data or 'name' not in data:
-        abort(400, 'Name is required')
-    
-    user_id = len(users) + 1
-    user = {
-        'id': user_id,
-        'name': data['name'],
-        'email': data.get('email', ''),
-        'created_at': datetime.now().isoformat()
-    }
-    
-    users.append(user)
-    logger.info(f"Created user: {user['name']}")
-    return jsonify(user), 201
+    try:
+        db = firestore.Client()
+        data = request.get_json()
+        
+        if not data or 'name' not in data:
+            abort(400, 'Name is required')
+        # user_id = len(users) + 1
+        # user = {
+        #     'id': user_id,
+        #     'name': data['name'],
+        #     'email': data.get('email', ''),
+        #     'created_at': datetime.now().isoformat()
+        # }
+        # users.append(user)
+
+
+        # storage
+        user_data = {
+            "name": data['name'],
+            "email": data.get('email', ''),
+            "created_at": datetime.now().isoformat()
+        }
+        db.collection("users").add(user_data)
+
+        
+        logger.info(f"Created user: {data['name']}")
+        return jsonify(user_data), 201
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        abort(500, 'Internal Server Error')
 
 @app.route('/api/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):

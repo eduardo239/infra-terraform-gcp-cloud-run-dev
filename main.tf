@@ -79,3 +79,10 @@ resource "google_cloud_run_service_iam_member" "default" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+resource "google_firestore_database" "default" {
+  project     = "learn-gcp-terraform-469711"
+  name        = "(default)"
+  location_id = "us-central1"
+  type        = "NATIVE"
+}
