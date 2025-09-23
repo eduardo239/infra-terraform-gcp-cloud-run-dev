@@ -1,0 +1,18 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA', '.']
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA']
+
+- name: 'hashicorp/terraform'
+  entrypoint: 'sh'
+  args:
+    - '-c'
+    - |
+      terraform init
+      terraform destroy -auto-approve -var="image_url=gcr.io/$PROJECT_ID/lastbit-dev:$COMMIT_SHA"
+
+# Configure logging to resolve service account error
+options:
+  logging: CLOUD_LOGGING_ONLY
