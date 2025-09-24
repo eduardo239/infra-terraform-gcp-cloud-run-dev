@@ -1,12 +1,4 @@
 
-terraform {
-  backend "gcs" {
-    bucket = "learn-gcp-terraform-469711-terraform-state"
-    prefix = "terraform/state/dev"
-
-  }
-}
-
 provider "google" {
   project = "learn-gcp-terraform-469711"
   region  = "us-central1"
