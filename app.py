@@ -2,12 +2,55 @@ from flask import Flask, jsonify, request, abort
 from google.cloud import firestore
 from datetime import datetime
 import logging
+import re
 
 app = Flask(__name__)
+
+# Segurança: limite de tamanho do body (1 MB)
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Limites de validação
+MAX_NAME_LENGTH = 200
+MAX_EMAIL_LENGTH = 254
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+def _add_security_headers(response):
+    """Adiciona headers de segurança à resposta."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    return response
+
+
+app.after_request(_add_security_headers)
+
+
+def _validate_name(name):
+    """Valida e sanitiza o nome (sem caracteres de controle)."""
+    if not name or not isinstance(name, str):
+        return None
+    name = name.strip()
+    if not name or len(name) > MAX_NAME_LENGTH:
+        return None
+    if any(ord(c) < 32 and c not in '\t' for c in name):
+        return None
+    return name
+
+
+def _validate_email(email):
+    """Valida formato de email (opcional)."""
+    if not email:
+        return ''
+    if not isinstance(email, str) or len(email) > MAX_EMAIL_LENGTH:
+        return None
+    return email if EMAIL_REGEX.match(email.strip()) else None
 
 # In-memory data store for demo purposes
 users = []
@@ -59,33 +102,33 @@ def create_user():
     """Create a new user"""
     try:
         db = firestore.Client()
-        data = request.get_json()
-        
+        data = request.get_json(force=False, silent=True)
+        if data is None:
+            abort(400, 'Invalid JSON')
+
         if not data or 'name' not in data:
             abort(400, 'Name is required')
-        # user_id = len(users) + 1
-        # user = {
-        #     'id': user_id,
-        #     'name': data['name'],
-        #     'email': data.get('email', ''),
-        #     'created_at': datetime.now().isoformat()
-        # }
-        # users.append(user)
 
+        name = _validate_name(data['name'])
+        if name is None:
+            abort(400, f'Name must be 1-{MAX_NAME_LENGTH} characters and contain no control characters')
 
-        # storage
+        email_raw = data.get('email', '')
+        email = _validate_email(email_raw) if email_raw else ''
+        if email is None:
+            abort(400, 'Invalid email format')
+
         user_data = {
-            "name": data['name'],
-            "email": data.get('email', ''),
+            "name": name,
+            "email": email,
             "created_at": datetime.now().isoformat()
         }
         db.collection("users").add(user_data)
 
-        
-        logger.info(f"Created user: {data['name']}")
+        logger.info("Created user successfully")
         return jsonify(user_data), 201
     except Exception as e:
-        logger.error(f"Error creating user: {e}")
+        logger.error("Error creating user: %s", str(e))
         abort(500, 'Internal Server Error')
 
 @app.route('/api/users/<int:user_id>', methods=['GET'])
@@ -102,16 +145,26 @@ def update_user(user_id):
     user = next((u for u in users if u['id'] == user_id), None)
     if not user:
         abort(404, 'User not found')
-    
-    data = request.get_json()
+
+    data = request.get_json(force=False, silent=True)
+    if data is None:
+        abort(400, 'Invalid JSON')
     if not data:
         abort(400, 'No data provided')
-    
-    user['name'] = data.get('name', user['name'])
-    user['email'] = data.get('email', user['email'])
+
+    if 'name' in data:
+        name = _validate_name(data['name'])
+        if name is None:
+            abort(400, f'Name must be 1-{MAX_NAME_LENGTH} characters and contain no control characters')
+        user['name'] = name
+    if 'email' in data:
+        email = _validate_email(data['email'])
+        if email is None:
+            abort(400, 'Invalid email format')
+        user['email'] = email
+
     user['updated_at'] = datetime.now().isoformat()
-    
-    logger.info(f"Updated user: {user['name']}")
+    logger.info("Updated user successfully")
     return jsonify(user)
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
@@ -130,8 +183,9 @@ def delete_user(user_id):
 @app.route('/api/process', methods=['POST'])
 def process_data():
     """Process data endpoint - simulates data processing"""
-    data = request.get_json()
-    
+    data = request.get_json(force=False, silent=True)
+    if data is None:
+        abort(400, 'Invalid JSON')
     if not data:
         abort(400, 'No data provided')
     
@@ -230,10 +284,20 @@ def bad_request(error):
         'status_code': 400
     }), 400
 
+@app.errorhandler(413)
+def payload_too_large(error):
+    """Handle 413 - Request Entity Too Large"""
+    return jsonify({
+        'error': 'Payload Too Large',
+        'message': 'Request body exceeds maximum allowed size (1 MB)',
+        'status_code': 413
+    }), 413
+
+
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
-    logger.error(f"Internal server error: {error}")
+    logger.error("Internal server error: %s", str(error))
     return jsonify({
         'error': 'Internal Server Error',
         'message': 'An unexpected error occurred',

@@ -1,6 +1,10 @@
 # Use official Python base image
 FROM python:3.11-slim
 
+# Executar como usuário não-root (segurança)
+RUN groupadd --gid 1000 appgroup \
+    && useradd --uid 1000 --gid appgroup --shell /bin/false --create-home appuser
+
 # Set working directory
 WORKDIR /app
 
@@ -9,7 +13,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
-COPY . .
+COPY --chown=appuser:appgroup . .
+
+# Garantir permissões
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 # Expose port 8080 for Cloud Run
 EXPOSE 8080

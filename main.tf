@@ -9,6 +9,14 @@ variable "image_url" {
   default     = "gcr.io/learn-gcp-terraform-469711/lastbit-dev:latest"
 }
 
+# Lista de membros com permissão para invocar o serviço (evite "allUsers" em produção).
+# Exemplos: ["allAuthenticatedUsers"], ["serviceAccount:meu-sa@projeto.iam.gserviceaccount.com"]
+variable "invoker_members" {
+  description = "List of members allowed to invoke the Cloud Run service (e.g. allAuthenticatedUsers or service account). Avoid allUsers in production."
+  type        = list(string)
+  default     = ["allAuthenticatedUsers"]
+}
+
 resource "google_cloud_run_service" "default" {
   name     = "lastbit-dev"
   location = "us-central1"
@@ -73,11 +81,12 @@ resource "google_cloud_run_service" "default" {
   }
 }
 
-resource "google_cloud_run_service_iam_member" "default" {
+resource "google_cloud_run_service_iam_member" "invoker" {
+  for_each = toset(var.invoker_members)
   service  = google_cloud_run_service.default.name
   location = google_cloud_run_service.default.location
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = each.value
 }
 
 resource "google_firestore_database" "default" {
